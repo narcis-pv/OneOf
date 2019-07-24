@@ -26,6 +26,11 @@ namespace OneOf.Tests
                 Converters = {new OneOfJsonConverter()}
             });
 
+            var obj = (OneOf<string, int, bool>)JsonConvert.DeserializeObject("true", typeof(OneOf<string, int, bool>), new JsonSerializerSettings()
+            {
+                Converters = { new OneOfJsonConverter() }
+            });
+
             //Then the OneOfs underlying value should have been written
             Assert.AreEqual("{\"Value\":\"A string value\"}", json);
         }
