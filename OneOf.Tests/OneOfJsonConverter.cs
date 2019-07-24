@@ -8,6 +8,45 @@ using Newtonsoft.Json.Linq;
 
 namespace OneOf
 {
+    public class OneOfJsonConverterWithDeserialization : JsonConverter
+    {
+        public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
+        {
+            if (value is IOneOf)
+            {
+                value = ((IOneOf) value).Value;
+            }
+            serializer.Serialize(writer, new
+            {
+                Value = value,
+                Type = value.GetType().FullName
+            });
+        }
+
+        public override object ReadJson(JsonReader reader, Type objectType, object existingValue, JsonSerializer serializer)
+        {
+            dynamic valueAndType = JObject.Load(reader);
+
+            var typeName = (string)valueAndType.Type;
+            var type = Type.GetType(typeName);
+
+            var value = ((JToken) valueAndType.Value).ToObject(type);
+
+            var method = objectType.GetMethod("op_Implicit", 
+                BindingFlags.Public | BindingFlags.Static, 
+                null,
+                new Type[] {type},
+                new ParameterModifier[0]);
+
+            return method.Invoke(null, new object[] {value});
+        }
+
+        public override bool CanConvert(Type objectType)
+        {
+            return objectType.GetTypeInfo().ImplementedInterfaces.Contains(typeof(IOneOf));
+        }       
+    }
+    
     public class OneOfJsonConverter : JsonConverter
     {
         public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
@@ -21,40 +60,12 @@ namespace OneOf
 
         public override object ReadJson(JsonReader reader, Type objectType, object existingValue, JsonSerializer serializer)
         {
-            var readFrom = JToken.ReadFrom(reader);
-
-            switch (reader.TokenType)
-            {
-                case JsonToken.Integer:
-                    return Cast(readFrom.Value<int>(), objectType);
-                case JsonToken.Float:
-                    return Cast(readFrom.Value<decimal>(), objectType);
-                case JsonToken.String:
-                    return Cast(readFrom.Value<string>(), objectType);
-                case JsonToken.Boolean:
-                    return Cast(readFrom.Value<bool>(), objectType);
-                case JsonToken.Null:
-                    return null;
-                case JsonToken.Undefined:
-                    return null;
-                case JsonToken.Date:
-                    return Cast(readFrom.Value<DateTime>(), objectType);
-                case JsonToken.Bytes:
-                    return Cast(readFrom.Value<byte[]>(), objectType);
-                default:
-                    throw new ArgumentOutOfRangeException();
-            }
+            throw new NotImplementedException();
         }
 
         public override bool CanConvert(Type objectType)
         {
             return objectType.GetTypeInfo().ImplementedInterfaces.Contains(typeof(IOneOf));
         }
-
-        object Cast(object obj, Type castTo)
-        {
-            return Dynamic.InvokeConvert(obj, castTo, true);
-        }
     }
-
 }
